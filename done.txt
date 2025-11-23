@@ -1,0 +1,20 @@
+Joshua Mullins
+1002041740
+
+sysproc.c and trap.c were modified for lazy page allocation and page fault handling.
+
+sys_sbrk in sysproc.c was modified to have 3 cases.
+Case 1, deallocate memory when n is negative which run for both page allocators.
+Case 2, allocate memory for the default page allocator when n is positive. Code has been refactored to allow for both page allocators
+but otherwise remains the same.
+Case 3, allocate memory for the lazy page allocator when n is positive. 
+This cases increase the virtual size of the process without allocating physical pages. 
+This is also where we check to make sure we are not expanding into kernel space.
+
+trap.c was modified to handle page faults when using the lazy page allocator.
+If a page fault occurs and the lazy page allocator is being used, we check 
+if the faulting address is within the process's allocated size. 
+If it is, we allocate a new physical page, map it to the faulting virtual address, 
+like we would in a normal page allocation scenario.
+If the faulting address is outside the process's allocated size, 
+we treat it like an out of bounds access like with the default page allocator.
