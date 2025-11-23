@@ -7,6 +7,7 @@
 #include "mmu.h"
 #include "proc.h"
 
+extern int page_allocator_type; 
 extern int free_frame_cnt; // CS3320 for project3
 int
 sys_fork(void)
@@ -50,11 +51,55 @@ sys_sbrk(void)
   int n;
 
   if(argint(0, &n) < 0)
+  {
     return -1;
+  } 
+
   addr = proc->sz;
-  if(growproc(n) < 0)
-    return -1;
-  return addr;
+  if(n < 0) // if we are deallocating pages
+  {
+    // try to deallocate pages and return -1 if failed
+    if(growproc(n) < 0)
+    {
+      return -1;
+    }
+    else 
+    {
+      return addr;
+    }
+  }
+  else if (n > 0) // if we are allocating pages 
+  {
+    if(page_allocator_type == 0) // default page allocator
+    {
+      // do the normal allocation 
+      if(growproc(n) < 0)
+      {
+        return -1;
+      }
+      else 
+      {
+        return addr;
+      }
+    }
+    else if (page_allocator_type == 1) // lazy page allocator
+    {
+      uint old = proc->sz;
+      proc->sz += n; // Increase the virtual size without allocating pages
+      if (proc->sz >= KERNBASE) // check if we expanded into kernel space
+      {
+        proc->sz = old; // If so, revert size change and return -1
+        cprintf("Allocating pages failed!\n");
+        return -1;
+      }
+      return addr; 
+    }
+    else 
+    {
+      return -1; // invalid page allocator type Should never happen but the compiler was yelling
+    }
+  }
+  else return proc->sz; // n == 0, do nothing
 }
 
 int
@@ -107,11 +152,6 @@ int sys_set_page_allocator(void)
     }
     // please remove the following 
     // when you start implementing your page allocator
-    if (page_allocator_type == 1)
-    {
-        cprintf("Your lazy allocator has not been implemented!\n");
-	return -1;
-    }
     return 0;
 }
 

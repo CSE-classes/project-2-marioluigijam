@@ -14,6 +14,9 @@ extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
 
+int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
+extern int page_allocator_type;
+
 void
 tvinit(void)
 {
@@ -36,7 +39,8 @@ idtinit(void)
 void
 trap(struct trapframe *tf)
 {
-  if(tf->trapno == T_SYSCALL){
+  if(tf->trapno == T_SYSCALL)
+  {
     if(proc->killed)
       exit();
     proc->tf = tf;
@@ -48,10 +52,39 @@ trap(struct trapframe *tf)
  // CS 3320 project 2
  // You might need to change the folloiwng default page fault handling
  // for your project 2
- if(tf->trapno == T_PGFLT){                 // CS 3320 project 2
+ if(tf->trapno == T_PGFLT)
+ {                 // CS 3320 project 2
+
     uint faulting_va;                       // CS 3320 project 2
     faulting_va = rcr2();                   // CS 3320 project 2
-    cprintf("Unhandled page fault for va:0x%x!\n", faulting_va);     // CS 3320 project 2
+    if(page_allocator_type == 0)
+    {
+      cprintf("Unhandled page fault for va:0x%x!\n", faulting_va);     // CS 3320 project 2
+    }
+    else if(page_allocator_type == 1)
+    {  
+      if(faulting_va > proc->sz) // If the page fault is beyond the virtual size 
+      {
+        // it is a true invalid access and we should kill the process
+        cprintf("Unhandled page fault for va:0x%x!\n", faulting_va);
+      }
+      else
+      {
+        char *mem;
+        uint bound = PGROUNDDOWN(faulting_va);
+        mem = kalloc();
+        if (mem == 0) // If we run out of memory
+        {
+          cprintf("Lazy allocator out of memory!\n");
+        }
+        else
+        {
+          memset(mem, 0, PGSIZE);
+          mappages(proc->pgdir, (char*)bound, PGSIZE, v2p(mem), PTE_W|PTE_U);
+          return;
+        }
+      }
+    }
  }
 
 
